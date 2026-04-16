@@ -9,6 +9,20 @@
       register: local_users
       changed_when: false
 
+    - name: Получить список доменных пользователей (если сервер в домене)
+      ansible.windows.win_command:
+        cmd: powershell.exe -Command "Get-WmiObject -Class Win32_UserAccount -Filter \"LocalAccount='False' AND Disabled='False'\" | Select-Object -ExpandProperty Name"
+      register: domain_users
+      changed_when: false
+      ignore_errors: true
+
+    - name: Получить залогиненных пользователей (включая доменных)
+      ansible.windows.win_command:
+        cmd: query user
+      register: logged_users
+      changed_when: false
+      ignore_errors: true
+
     - name: Получить группы для каждого пользователя (упрощенная версия)
       ansible.windows.win_shell: |
         $user = '{{ item }}'
@@ -31,4 +45,7 @@
       ansible.builtin.debug:
         msg:
           host: "{{ inventory_hostname }}"
-          users: "{{ users_info }}"
+          local_users: "{{ local_users.stdout_lines }}"
+          domain_users: "{{ domain_users.stdout_lines | default([]) }}"
+          logged_users: "{{ logged_users.stdout_lines | default([]) }}"
+          users_with_groups: "{{ users_info }}"

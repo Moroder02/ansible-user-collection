@@ -3,24 +3,28 @@
   hosts: windows
   gather_facts: false
   tasks:
-    - name: Получить список локальных пользователей
+    - name: Получить список локальных пользователей (совместимо с старыми версиями)
       ansible.windows.win_command:
-        cmd: powershell.exe -Command "Get-LocalUser | Where-Object { $_.Enabled -eq $true } | Select-Object -ExpandProperty Name"
+        cmd: powershell.exe -Command "Get-WmiObject -Class Win32_UserAccount -Filter \"LocalAccount='True' AND Disabled='False'\" | Select-Object -ExpandProperty Name"
       register: local_users
       changed_when: false
 
-    - name: Получить группы для каждого пользователя
+    - name: Получить группы для каждого пользователя (упрощенная версия)
       ansible.windows.win_shell: |
         $user = '{{ item }}'
-        $groups = Get-LocalGroup | Where-Object { (Get-LocalGroupMember -Group $_.Name).Name -contains $user } | Select-Object -ExpandProperty Name
-        $groups -join ','
+        try {
+          $groups = net localgroup | Where-Object { $_ -match '^\\*' } | ForEach-Object { $_.TrimStart('*') } | Where-Object { net localgroup $_ 2>$null | Select-String -Pattern $user }
+          $groups -join ','
+        } catch {
+          'Не удалось получить группы'
+        }
       loop: "{{ local_users.stdout_lines }}"
       register: user_groups
       changed_when: false
 
     - name: Сформировать итоговый список пользователей и групп
       ansible.builtin.set_fact:
-        users_info: "{{ users_info | default([]) + [{ 'user': item.item, 'groups': item.stdout.split(',') }] }}"
+        users_info: "{{ users_info | default([]) + [{ 'user': item.item, 'groups': item.stdout.split(',') if item.stdout != 'Не удалось получить группы' else [] }] }}"
       loop: "{{ user_groups.results }}"
 
     - name: Вывести информацию по хосту

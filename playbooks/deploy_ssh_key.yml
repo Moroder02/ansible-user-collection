@@ -1,6 +1,6 @@
 ---
 - name: Скопировать публичный ключ Ansible-сервера на хосты
-  hosts: all
+  hosts: linux
   gather_facts: false
   tasks:
     - name: Разместить публичный ключ в authorized_keys пользователя

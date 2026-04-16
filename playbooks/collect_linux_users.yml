@@ -1,0 +1,27 @@
+---
+- name: Собрать информацию о пользователях на серверах
+  hosts: linux
+  gather_facts: false
+  tasks:
+    - name: Получить список пользователей из /etc/passwd
+      ansible.builtin.command:
+        cmd: awk -F: '$3 >= 1000 && $1 != "nobody" { print $1 }' /etc/passwd
+      register: passwd_users
+      changed_when: false
+
+    - name: Получить группы для каждого пользователя
+      ansible.builtin.shell: id -Gn {{ item }}
+      loop: "{{ passwd_users.stdout_lines }}"
+      register: user_groups
+      changed_when: false
+
+    - name: Сформировать итоговый список пользователей и групп
+      ansible.builtin.set_fact:
+        users_info: "{{ users_info | default([]) + [{ 'user': item.item, 'groups': item.stdout.split() }] }}"
+      loop: "{{ user_groups.results }}"
+
+    - name: Вывести информацию по хосту
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          users: "{{ users_info }}"

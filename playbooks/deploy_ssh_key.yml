@@ -1,0 +1,10 @@
+---
+- name: Скопировать публичный ключ Ansible-сервера на хосты
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Разместить публичный ключ в authorized_keys пользователя
+      ansible.builtin.authorized_key:
+        user: "{{ ansible_user }}"
+        state: present
+        key: "{{ lookup('file', '../files/ansible_id_rsa.pub') }}"

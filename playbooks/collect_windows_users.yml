@@ -1,0 +1,30 @@
+---
+- name: Собрать информацию о пользователях на Windows-серверах
+  hosts: windows
+  gather_facts: false
+  tasks:
+    - name: Получить список локальных пользователей
+      ansible.windows.win_command:
+        cmd: powershell.exe -Command "Get-LocalUser | Where-Object { $_.Enabled -eq $true } | Select-Object -ExpandProperty Name"
+      register: local_users
+      changed_when: false
+
+    - name: Получить группы для каждого пользователя
+      ansible.windows.win_shell: |
+        $user = '{{ item }}'
+        $groups = Get-LocalGroup | Where-Object { (Get-LocalGroupMember -Group $_.Name).Name -contains $user } | Select-Object -ExpandProperty Name
+        $groups -join ','
+      loop: "{{ local_users.stdout_lines }}"
+      register: user_groups
+      changed_when: false
+
+    - name: Сформировать итоговый список пользователей и групп
+      ansible.builtin.set_fact:
+        users_info: "{{ users_info | default([]) + [{ 'user': item.item, 'groups': item.stdout.split(',') }] }}"
+      loop: "{{ user_groups.results }}"
+
+    - name: Вывести информацию по хосту
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          users: "{{ users_info }}"

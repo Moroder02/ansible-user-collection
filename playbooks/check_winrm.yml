@@ -1,0 +1,7 @@
+---
+- name: Проверить подключение к Windows-хостам
+  hosts: windows
+  gather_facts: false
+  tasks:
+    - name: Тест WinRM-подключения
+      ansible.windows.win_ping:
